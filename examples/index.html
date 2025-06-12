@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SabaLessShare デモ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f0f4f8;
+    }
+
+    .container {
+      max-width: 800px;
+    }
+
+    .message-box {
+      background-color: #e0f2f7;
+      border-left: 4px solid #00bcd4;
+      color: #00798c;
+    }
+
+    .error-box {
+      background-color: #ffebee;
+      border-left: 4px solid #f44336;
+      color: #d32f2f;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+  <div class="container bg-white shadow-xl rounded-lg p-8 space-y-8">
+    <h1 class="text-4xl font-bold text-center text-gray-800 mb-8">SabaLessShare デモ</h1>
+
+    <!-- メッセージ表示エリア -->
+    <div id="message-box" class="hidden message-box p-4 rounded-md text-sm"></div>
+    <div id="error-box" class="hidden error-box p-4 rounded-md text-sm"></div>
+
+    <!-- 共有リンク生成セクション -->
+    <div class="bg-blue-50 p-6 rounded-lg shadow-sm">
+      <h2 class="text-2xl font-semibold text-blue-800 mb-4">共有リンク生成</h2>
+      <div class="space-y-4">
+        <div>
+          <label for="payloadInput" class="block text-sm font-medium text-gray-700 mb-1">共有するデータ文字列:</label>
+          <textarea id="payloadInput"
+            class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            rows="4" placeholder="ここに共有したいテキストを入力してください。例: 機密情報、ファイルIDなど"></textarea>
+        </div>
+        <div class="flex items-center space-x-2">
+          <input type="checkbox" id="passwordProtectCheckbox"
+            class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <label for="passwordProtectCheckbox" class="text-sm font-medium text-gray-700">パスワードで保護する</label>
+        </div>
+        <div id="passwordSection" class="hidden">
+          <label for="passwordInput" class="block text-sm font-medium text-gray-700 mb-1">パスワード:</label>
+          <input type="password" id="passwordInput"
+            class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="パスワードを入力してください">
+        </div>
+        <button id="createLinkBtn"
+          class="w-full bg-blue-600 text-white py-3 px-4 rounded-md shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out">
+          共有リンクを生成
+        </button>
+      </div>
+      <div id="generatedLinkSection" class="mt-6 p-4 bg-blue-100 border border-blue-200 rounded-md shadow-inner hidden">
+        <label for="generatedLinkOutput" class="block text-sm font-medium text-blue-800 mb-2">生成された共有リンク:</label>
+        <textarea id="generatedLinkOutput"
+          class="w-full p-3 border border-blue-300 rounded-md bg-blue-50 text-blue-900 font-mono text-sm resize-none"
+          rows="3" readonly></textarea>
+        <button id="copyLinkBtn"
+          class="mt-3 bg-blue-500 text-white py-2 px-4 rounded-md shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 transition duration-150 ease-in-out">
+          リンクをコピー
+        </button>
+      </div>
+    </div>
+
+    <!-- 共有リンク閲覧セクション -->
+    <div class="bg-green-50 p-6 rounded-lg shadow-sm">
+      <h2 class="text-2xl font-semibold text-green-800 mb-4">共有リンク閲覧</h2>
+      <p class="text-gray-700 mb-4">
+        このページが共有リンクとして開かれた場合、ここに復号されたデータが表示されます。
+        <br>
+        <strong>注:</strong> ページ読み込み時に自動的に処理されます。
+      </p>
+      <div id="decryptedDataSection"
+        class="mt-4 p-4 bg-green-100 border border-green-200 rounded-md shadow-inner hidden">
+        <label for="decryptedDataOutput" class="block text-sm font-medium text-green-800 mb-2">復号されたデータ:</label>
+        <textarea id="decryptedDataOutput"
+          class="w-full p-3 border border-green-300 rounded-md bg-green-50 text-green-900 font-mono text-sm resize-none"
+          rows="6" readonly></textarea>
+      </div>
+      <div id="noDataMessage"
+        class="mt-4 p-4 bg-gray-100 border border-gray-200 rounded-md shadow-inner text-gray-600 text-center">
+        共有されたデータがありません。
+      </div>
+    </div>
+  </div>
+
+  <!-- SabaLessShare のデモロジックを読み込む -->
+  <script type="module" src="app.js"></script>
+</body>
+
+</html>
+```
