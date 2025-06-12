@@ -1,12 +1,20 @@
 {
   "name": "saba-less-share",
   "version": "1.0.0",
-  "description": "A serverless, secure data sharing library using Web Crypto API.",
-  "main": "dist/main.js",
-  "module": "dist/module.js",
+  "description": "Serverless and browser-archived Less-effort Share. A framework-agnostic library for secure, client-side data sharing.",
+  "main": "src/index.js",
+  "type": "module",
   "scripts": {
-    "build": "webpack --mode production",
-    "dev": "webpack --mode development --watch",
-    "start-example": "webpack serve --config webpack.config.js --env development"
+    "test": "jest"
+  },
+  "dependencies": {
+    "argon2-browser": "^1.18.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
