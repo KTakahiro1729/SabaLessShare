@@ -25,3 +25,10 @@ export class DecryptionError extends Error {
     this.name = 'DecryptionError';
   }
 }
+
+export class PayloadTooLargeError extends Error {
+  constructor(message = 'Payload too large for simple mode. Please use Cloud Mode instead.') {
+    super(message);
+    this.name = 'PayloadTooLargeError';
+  }
+}
