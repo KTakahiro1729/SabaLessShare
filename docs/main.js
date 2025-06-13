@@ -2,9 +2,6 @@ import { createShareLink, receiveSharedData } from '../src/index.js';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../src/crypto.js';
 
 // --- ハンドラ定義 ---
-const a = document.createElement('a');
-a.href = './';
-const BASE_URL = a.href;
 
 // cloudモード用の簡易的なインメモリKVS
 const cloudStorage = new Map();
