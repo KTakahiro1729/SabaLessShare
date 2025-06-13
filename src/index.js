@@ -2,6 +2,7 @@ import {
   generateDek, generateKek, generateSalt, encryptData, decryptData,
   exportKeyToString, importKeyFromString, arrayBufferToBase64, base64ToArrayBuffer
 } from './crypto.js';
+import * as pako from 'pako';
 import { parseShareUrl } from './url.js';
 import { InvalidLinkError, ExpiredLinkError, PasswordRequiredError } from './errors.js';
 
@@ -11,17 +12,25 @@ import { InvalidLinkError, ExpiredLinkError, PasswordRequiredError } from './err
  * data: ArrayBuffer,
  * uploadHandler: (data: ArrayBuffer) => Promise<string>,
  * shortenUrlHandler: (url: string) => Promise<string>,
+ * mode: 'simple' | 'cloud',
  * password?: string,
  * expiresIn?: number
  * }} options
  * @returns {Promise<string>} 最終的な共有URL
  */
-export async function createShareLink({ data, uploadHandler, shortenUrlHandler, password, expiresIn }) {
+export async function createShareLink({ data, mode, uploadHandler, shortenUrlHandler, password, expiresIn }) {
   const dek = await generateDek();
   const expdate = expiresIn ? new Date(Date.now() + expiresIn) : null;
   const aad = expdate ? new TextEncoder().encode(expdate.toISOString()) : undefined;
 
-  const { ciphertext, iv } = await encryptData(dek, data, aad);
+  let payloadToEncrypt;
+  if (mode === 'simple') {
+    payloadToEncrypt = pako.gzip(new Uint8Array(data)).buffer;
+  } else {
+    payloadToEncrypt = data;
+  }
+
+  const { ciphertext, iv } = await encryptData(dek, payloadToEncrypt, aad);
 
   const payloadUrl = await uploadHandler(ciphertext);
 
@@ -44,6 +53,7 @@ export async function createShareLink({ data, uploadHandler, shortenUrlHandler, 
   });
   if (salt) params.set('salt', arrayBufferToBase64(salt));
   if (expdate) params.set('expdate', expdate.toISOString());
+  params.set('mode', mode);
 
   const accessURL = await shortenUrlHandler(payloadUrl);
 
@@ -63,7 +73,7 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
   const params = parseShareUrl(location);
   if (!params) throw new InvalidLinkError('Not a valid share link.');
 
-  const { payloadUrl, key, salt, expdate, iv: ivBase64 } = params;
+  const { payloadUrl, key, salt, expdate, iv: ivBase64, mode } = params;
 
   if (expdate && new Date() > new Date(expdate)) {
     throw new ExpiredLinkError('This link has expired.');
@@ -87,10 +97,17 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
   const encryptedPayload = await downloadHandler(payloadUrl);
   const aad = expdate ? new TextEncoder().encode(expdate) : undefined;
 
-  return await decryptData(dek, {
+  const decryptedPayload = await decryptData(dek, {
     ciphertext: encryptedPayload,
     iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
     additionalData: aad
   });
+
+  if (mode === 'simple') {
+    return pako.ungzip(new Uint8Array(decryptedPayload)).buffer;
+  }
+
+  return decryptedPayload;
 }
+
 
