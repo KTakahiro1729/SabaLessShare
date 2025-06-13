@@ -12,8 +12,11 @@ const cloudStorage = new Map();
 const uploadHandler = async (data) => {
     const mode = document.querySelector('input[name="mode"]:checked').value;
     if (mode === 'simple') {
-        const payloadB64 = arrayBufferToBase64(data);
-        return `${BASE_URL}?epayload=${encodeURIComponent(payloadB64)}`;
+        const serialized = JSON.stringify({
+            ciphertext: arrayBufferToBase64(data.ciphertext),
+            iv: arrayBufferToBase64(data.iv)
+        });
+        return serialized;
     } else { // cloud
         const fileId = crypto.randomUUID();
         // 実際にはサーバーにアップロードするが、デモではMapに保存
@@ -43,11 +46,13 @@ const shortenUrlHandler = async (longUrl) => {
 };
 
 const downloadHandler = async (idOrUrl) => {
-    // URLかファイルIDかを判定
-    if (idOrUrl.startsWith('http')) { // simple mode
-        const url = new URL(idOrUrl);
-        const payloadB64 = url.searchParams.get('epayload');
-        return base64ToArrayBuffer(payloadB64);
+    // JSON文字列かファイルIDかを判定
+    if (idOrUrl.trim().startsWith('{')) { // simple mode
+        const { ciphertext, iv } = JSON.parse(idOrUrl);
+        return {
+            ciphertext: base64ToArrayBuffer(ciphertext),
+            iv: new Uint8Array(base64ToArrayBuffer(iv))
+        };
     } else { // cloud mode
         console.log(`[Mock] Cloud Storageから取得: ID=${idOrUrl}`);
         if (!cloudStorage.has(idOrUrl)) throw new Error("File not found in mock storage");
