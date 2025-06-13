@@ -4,7 +4,10 @@ import {
 } from './crypto.js';
 import * as pako from 'pako';
 import { parseShareUrl } from './url.js';
-import { InvalidLinkError, ExpiredLinkError, PasswordRequiredError } from './errors.js';
+import { InvalidLinkError, ExpiredLinkError, PasswordRequiredError, PayloadTooLargeError } from './errors.js';
+
+// URL length safety limit for simple mode's epayload (pre-encoding)
+const SIMPLE_MODE_PAYLOAD_LIMIT = 7500;
 
 /**
  * データを暗号化し、共有用の短縮URLを生成する
@@ -59,6 +62,11 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
   params.set('mode', mode);
 
   const epayload = arrayBufferToBase64(encPayload);
+
+  if (mode === 'simple' && epayload.length > SIMPLE_MODE_PAYLOAD_LIMIT) {
+    throw new PayloadTooLargeError('Payload too large for simple mode. Please use Cloud Mode instead.');
+  }
+
   const base = typeof location !== 'undefined' ? location.href.split('#')[0].split('?')[0] : '';
   const accessURL = await shortenUrlHandler(`${base}?epayload=${encodeURIComponent(epayload)}`);
 

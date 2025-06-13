@@ -17,6 +17,7 @@ jest.unstable_mockModule('argon2-browser', () => ({
 
 const { createShareLink, receiveSharedData } = await import('../src/index.js');
 const { arrayBufferToBase64, base64ToArrayBuffer } = await import('../src/crypto.js');
+const { PayloadTooLargeError } = await import('../src/errors.js');
 
 // --- テスト用のモックハンドラ ---
 const MOCK_BASE_URL = 'https://example.com/demo/';
@@ -108,5 +109,17 @@ describe('SabaLessShare Integration Tests', () => {
             downloadHandler: mockDownloadHandler,
             passwordPromptHandler: async () => null,
         })).rejects.toThrow('This link has expired.');
+    });
+
+    it('simpleモードでペイロードが大きすぎる場合にエラーをスローすること', async () => {
+        const bigData = crypto.getRandomValues(new Uint8Array(10000));
+        const bigUploadHandler = async () => 'x'.repeat(8000);
+
+        await expect(createShareLink({
+            data: bigData,
+            mode: 'simple',
+            uploadHandler: bigUploadHandler,
+            shortenUrlHandler: mockShortenUrlHandler,
+        })).rejects.toThrow(PayloadTooLargeError);
     });
 });
