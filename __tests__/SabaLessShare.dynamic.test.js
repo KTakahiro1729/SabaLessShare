@@ -88,4 +88,19 @@ describe('Dynamic Sharing API', () => {
     expect(new TextDecoder().decode(received)).toBe('updated');
     expect(adapter.update).toHaveBeenCalledTimes(1);
   });
+
+  it('throws if adapter is missing', async () => {
+    const data = new TextEncoder().encode('x');
+    await expect(createDynamicLink({ data: data.buffer })).rejects.toThrow('adapter');
+  });
+
+  it('wraps adapter errors', async () => {
+    const failingAdapter = {
+      create: jest.fn(async () => { throw new Error('boom'); }),
+      read: jest.fn(),
+      update: jest.fn()
+    };
+    const data = new TextEncoder().encode('err');
+    await expect(createDynamicLink({ data: data.buffer, adapter: failingAdapter })).rejects.toThrow("Storage adapter failed during 'create'");
+  });
 });
