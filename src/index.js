@@ -88,7 +88,7 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
   if (salt) {
     const password = await passwordPromptHandler();
     if (!password) throw new PasswordRequiredError('Password is required but was not provided.');
-    const kek = await generateKek(password, base64ToArrayBuffer(salt));
+    const kek = await generateKek(password, new Uint8Array(base64ToArrayBuffer(salt)));
     const [encCipher, encIv] = key.split('.');
     const rawDek = await decryptData(kek, {
       ciphertext: base64ToArrayBuffer(encCipher),
