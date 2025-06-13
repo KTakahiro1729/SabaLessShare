@@ -46,7 +46,7 @@ export function generateSalt(length = 16) {
  */
 export async function generateDek() {
   return cryptoObj.subtle.generateKey(
-    { name: 'AES-GCM', length: 256 },
+    { name: 'AES-GCM', length: 128 },
     true,
     ['encrypt', 'decrypt']
   );
