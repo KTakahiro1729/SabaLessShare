@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "build": "esbuild docs/main.js --bundle --outfile=docs/bundle.js --allow-overwrite"
+    "build": "esbuild docs/main.js --bundle --outfile=docs/bundle.js --allow-overwrite --platform=browser --format=esm --external:fs --external:path --external:url --external:crypto"
   },
   "dependencies": {
     "argon2-browser": "^1.18.0",

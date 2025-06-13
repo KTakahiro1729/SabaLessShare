@@ -1,10 +1,29 @@
-import argon2 from 'argon2-browser';
 import { DecryptionError } from './errors.js';
-import { webcrypto as nodeCrypto } from 'crypto';
 
-const cryptoObj = globalThis.crypto && globalThis.crypto.subtle
-  ? globalThis.crypto
-  : nodeCrypto;
+const cryptoObj = globalThis.crypto;
+
+let argon2Promise;
+async function getArgon2() {
+  if (!argon2Promise) {
+    if (typeof process !== 'undefined' && process.versions?.node) {
+      globalThis.loadArgon2WasmBinary = async () => {
+        const fs = await import('fs');
+        const path = await import('path');
+        const url = await import('url');
+        const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+        const wasmPath = path.resolve(
+          __dirname,
+          '../node_modules/argon2-browser/dist/argon2.wasm'
+        );
+        return new Uint8Array(fs.readFileSync(wasmPath));
+      };
+    }
+    argon2Promise = import('argon2-browser/dist/argon2-bundled.min.js').then(
+      (m) => m.default
+    );
+  }
+  return argon2Promise;
+}
 
 /**
  * ArrayBufferをBase64文字列に変換する
@@ -64,6 +83,7 @@ export async function generateDek() {
  */
 export async function generateKek(password, salt) {
   if (!password || !salt) throw new Error('Password and salt are required for KEK generation.');
+  const argon2 = await getArgon2();
   const result = await argon2.hash({
     pass: password,
     salt: salt,
