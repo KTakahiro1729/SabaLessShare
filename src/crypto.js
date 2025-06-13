@@ -1,10 +1,6 @@
 import argon2 from 'argon2-browser';
 import { DecryptionError } from './errors.js';
-import { webcrypto as nodeCrypto } from 'crypto';
-
-const cryptoObj = globalThis.crypto && globalThis.crypto.subtle
-  ? globalThis.crypto
-  : nodeCrypto;
+const cryptoObj = globalThis.crypto;
 
 /**
  * ArrayBufferをBase64文字列に変換する
