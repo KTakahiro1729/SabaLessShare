@@ -2,6 +2,8 @@
 
 > サーバーレスかつブラウザ完結の簡易データ共有ライブラリ。フレームワークに依存せず、安全なクライアントサイドデータ共有を実現します。
 
+Simpleモードがテストできる実装サンプルはdocsフォルダに実装されており、[Github Pages](https://ktakahiro1729.github.io/SabaLessShare/)から確認できます。
+
 ## 📦 インストール
 
 本パッケージはまだ npm に公開されていません。GitHub からインストールできます。
@@ -57,6 +59,7 @@ const link = await createShareLink({
 });
 console.log(link);
 ```
+
 
 ### receiveSharedData(options)
 
