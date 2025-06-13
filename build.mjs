@@ -14,6 +14,6 @@ build({
   allowOverwrite: true,
   format: 'iife',
   plugins: [ignoreNodeBuiltIns],
-  loader: { '.wasm': 'file' },
+  loader: { '.wasm': 'base64' },
 }).catch(() => process.exit(1));
 
