@@ -83,6 +83,40 @@ const data = await receiveSharedData({
 // 復号データを利用...
 ```
 
+## Dynamic Sharing API
+
+3ファイル方式の動的共有を簡潔に利用するための高レベルAPIです。実際の保存処理は
+`storageAdapter` が担います。
+
+### storageAdapter インターフェース
+
+- `create(data: any): Promise<string>` — データを保存してIDを返す
+- `read(id: string): Promise<any>` — IDからデータを取得
+- `update(id: string, data: any): Promise<void>` — 既存データを上書き
+
+### createDynamicLink(options)
+
+- `data: ArrayBuffer` — 保存するデータ
+- `adapter: storageAdapter` — ストレージ操作を実装したオブジェクト
+- `password?: string` — パスワード指定時、DEKを暗号化
+- `expiresIn?: number` — リンクの有効期限 (ms)
+
+戻り値は `{ shareLink, pointerFileId, key, salt }`。
+
+### receiveDynamicData(options)
+
+- `location: Location` — 解析対象のURL
+- `adapter: storageAdapter` — データ取得に使用
+- `passwordPromptHandler: () => Promise<string|null>` — パスワード入力ハンドラ
+
+### updateDynamicLink(options)
+
+- `pointerFileId: string` — ポインタファイルID
+- `newData: ArrayBuffer` — 新しいデータ
+- `key: string` / `salt: string|null` — `createDynamicLink`の戻り値
+- `password?: string` — パスワード保護時に指定
+- `adapter: storageAdapter` — ストレージアダプター
+
 ## セキュリティ機能
 
 ### 暗号化
@@ -124,6 +158,8 @@ https://example.com/demo/?epayload=<base64-encoded-encrypted-file-id>#key=<key>&
 * **src/index.js**
   * `createShareLink` - データ共有リンクの生成
   * `receiveSharedData` - 共有データの受信・復号
+* **src/dynamic.js**
+  * `createDynamicLink` / `receiveDynamicData` / `updateDynamicLink` - 動的共有API
 * **src/crypto.js**
   * `arrayBufferToBase64` / `base64ToArrayBuffer` - Base64エンコーディング
   * `generateSalt`, `generateDek`, `generateKek` - 暗号鍵生成

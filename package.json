@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Serverless and browser-archived Less-effort Share. A framework-agnostic library for secure, client-side data sharing.",
   "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./dynamic": "./src/dynamic.js"
+  },
   "type": "module",
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
