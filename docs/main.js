@@ -1,0 +1,128 @@
+import { createShareLink, receiveSharedData } from '../src/index.js';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '../src/crypto.js';
+
+// --- ハンドラ定義 ---
+const a = document.createElement('a');
+a.href = './';
+const BASE_URL = a.href;
+
+// cloudモード用の簡易的なインメモリKVS
+const cloudStorage = new Map();
+
+const uploadHandler = async (data) => {
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    if (mode === 'simple') {
+        const payloadB64 = arrayBufferToBase64(data);
+        return `${BASE_URL}?epayload=${encodeURIComponent(payloadB64)}`;
+    } else { // cloud
+        const fileId = crypto.randomUUID();
+        // 実際にはサーバーにアップロードするが、デモではMapに保存
+        cloudStorage.set(fileId, data);
+        console.log(`[Mock] Cloud Storageに保存: ID=${fileId}`);
+        return fileId;
+    }
+};
+
+const shortenUrlHandler = async (longUrl) => {
+    // TinyURLのシンプルなAPIエンドポイントを利用
+    const apiUrl = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`;
+    console.log(`[TinyURL] 短縮リクエスト: ${apiUrl}`);
+    try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+            throw new Error(`TinyURL API failed with status: ${response.status}`);
+        }
+        const shortUrl = await response.text();
+        console.log(`[TinyURL] 短縮成功: ${longUrl} -> ${shortUrl}`);
+        return shortUrl;
+    } catch (error) {
+        console.error("URL短縮に失敗しました。元のURLを返します。", error);
+        // APIが失敗した場合はフォールバックとして元のURLを返す
+        return longUrl;
+    }
+};
+
+const downloadHandler = async (idOrUrl) => {
+    // URLかファイルIDかを判定
+    if (idOrUrl.startsWith('http')) { // simple mode
+        const url = new URL(idOrUrl);
+        const payloadB64 = url.searchParams.get('epayload');
+        return base64ToArrayBuffer(payloadB64);
+    } else { // cloud mode
+        console.log(`[Mock] Cloud Storageから取得: ID=${idOrUrl}`);
+        if (!cloudStorage.has(idOrUrl)) throw new Error("File not found in mock storage");
+        return cloudStorage.get(idOrUrl);
+    }
+};
+
+const passwordPromptHandler = async () => {
+    return prompt("パスワードを入力してください:");
+};
+
+
+// --- UIロジック ---
+const createView = document.getElementById('createView');
+const receiveView = document.getElementById('receiveView');
+const receivedDataEl = document.getElementById('receivedData');
+
+async function handleReceive() {
+    console.log("受信モードで起動します");
+    createView.classList.add('hidden');
+    receiveView.classList.remove('hidden');
+
+    try {
+        const decryptedData = await receiveSharedData({
+            location: window.location,
+            downloadHandler,
+            passwordPromptHandler
+        });
+        const text = new TextDecoder().decode(decryptedData);
+        receivedDataEl.textContent = text;
+    } catch (e) {
+        console.error(e);
+        receivedDataEl.textContent = `エラー: ${e.message}`;
+    }
+}
+
+function handleCreate() {
+    console.log("作成モードで起動します");
+    const createLinkBtn = document.getElementById('createLinkBtn');
+    const outputUrlEl = document.getElementById('outputUrl');
+
+    createLinkBtn.onclick = async () => {
+        const dataText = document.getElementById('data').value;
+        if (!dataText) {
+            alert("共有データを入力してください。");
+            return;
+        }
+        const data = new TextEncoder().encode(dataText);
+        const mode = document.querySelector('input[name="mode"]:checked').value;
+        const password = document.getElementById('password').value || undefined;
+        const expiresInSeconds = document.getElementById('expiresIn').value;
+        const expiresIn = expiresInSeconds ? parseInt(expiresInSeconds, 10) * 1000 : undefined;
+        
+        try {
+            outputUrlEl.textContent = "生成中...";
+            const link = await createShareLink({
+                data,
+                mode,
+                uploadHandler,
+                shortenUrlHandler,
+                password,
+                expiresIn,
+            });
+            outputUrlEl.innerHTML = `<a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>`;
+        } catch(e) {
+            console.error(e);
+            outputUrlEl.textContent = `エラー: ${e.message}`;
+        }
+    };
+}
+
+// 起動時の処理
+// URLにフラグメントがあれば受信モード、なければ作成モード
+if (window.location.hash) {
+    handleReceive();
+} else {
+    handleCreate();
+}

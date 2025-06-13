@@ -1,6 +1,7 @@
 /** @type {import('jest').Config} */
 const config = {
-  testEnvironment: 'jest-environment-jsdom',
+  testEnvironment: 'node',
+  setupFiles: ['./jest.setup.js'],
 };
 
 export default config;
