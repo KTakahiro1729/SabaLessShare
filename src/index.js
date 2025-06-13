@@ -75,8 +75,9 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
  * @returns {Promise<ArrayBuffer>} 復号されたデータ
  */
 export async function receiveSharedData({ location, downloadHandler, passwordPromptHandler }) {
-  const params = parseShareUrl(location);
-  if (!params) throw new InvalidLinkError('Not a valid share link.');
+  try {
+    const params = parseShareUrl(location);
+    if (!params) throw new InvalidLinkError('Not a valid share link.');
 
   const { key, salt, expdate, iv: ivBase64, mode } = params;
 
@@ -111,17 +112,23 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
 
   const downloadData = await downloadHandler(fileId);
 
-  const decryptedPayload = await decryptData(dek, {
-    ciphertext: downloadData.ciphertext,
-    iv: downloadData.iv,
-    additionalData: aad
-  });
+    const decryptedPayload = await decryptData(dek, {
+      ciphertext: downloadData.ciphertext,
+      iv: downloadData.iv,
+      additionalData: aad
+    });
 
-  if (mode === 'simple') {
-    return pako.ungzip(new Uint8Array(decryptedPayload)).buffer;
+    if (mode === 'simple') {
+      return pako.ungzip(new Uint8Array(decryptedPayload)).buffer;
+    }
+
+    return decryptedPayload;
+  } finally {
+    if (typeof history !== 'undefined') {
+      const base = location.href.split('#')[0].split('?')[0];
+      history.replaceState(null, '', base);
+    }
   }
-
-  return decryptedPayload;
 }
 
 
