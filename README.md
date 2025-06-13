@@ -34,20 +34,22 @@ import { createShareLink, receiveSharedData } from 'saba-less-share';
 #### オプション
 
 * `data: ArrayBuffer` — 共有したいバイナリデータ
-* `uploadHandler: (data: { ciphertext: ArrayBuffer, iv: Uint8Array }) => Promise<string>` — 暗号化したデータをアップロードし、ファイルIDを返す関数
+* `mode: 'simple' | 'cloud'` — 動作モード（デフォルト: `'simple'`）。`simple`では gzip 圧縮してから暗号化、`cloud`では生データを暗号化
+* `uploadHandler: (data: { ciphertext: ArrayBuffer, iv: Uint8Array }) => Promise<string>` — 暗号化したデータをアップロードし、ファイルIDまたはURLを返す関数
 * `shortenUrlHandler: (url: string) => Promise<string>` — `epayload` をクエリに含むURLを短縮する関数
-* `password?: string` — （任意）DEKを暗号化するパスワード
-* `expiresIn?: number` — （任意）リンクの有効期限（ミリ秒単位）
+* `password?: string` — （任意）KEKを生成するためのパスワード。指定すると、DEKがパスワードベースで暗号化される
+* `expiresIn?: number` — （任意）リンクの有効期限（ミリ秒単位）。設定しない場合無期限。
 
 #### 戻り値
 
-* `Promise<string>` — 完成した共有URL（`#key=…&iv=…&salt=…&expdate=…` を含む）
+* `Promise<string>` — 完成した共有URL（`#key=…&iv=…&salt=…&expdate=…&mode=…` を含む）
 
 #### サンプル
 
 ```js
 const link = await createShareLink({
   data: yourArrayBuffer,
+  mode: 'simple',
   uploadHandler: uploadToServer,
   shortenUrlHandler: shortenWithService,
   password: 'mySecret',
@@ -64,7 +66,7 @@ console.log(link);
 
 * `location: Location` — 通常は `window.location`
 * `downloadHandler: (id: string) => Promise<{ ciphertext: ArrayBuffer, iv: Uint8Array }>` — ファイルIDから暗号化データを取得する関数
-* `passwordPromptHandler: () => Promise<string|null>` — パスワードを入力させる関数。入力なければ `null`
+* `passwordPromptHandler: () => Promise<string|null>` — パスワードを入力させる関数。入力がなければ `null`
 
 #### 戻り値
 
@@ -81,27 +83,112 @@ const data = await receiveSharedData({
 // 復号データを利用...
 ```
 
-## 🛠️ モジュール構成
+## セキュリティ機能
+
+### 暗号化
+
+- **AES-GCM 128bit** でデータを暗号化
+- データ暗号化キー（DEK）とキー暗号化キー（KEK）の2層構造
+- パスワード指定時は **Argon2id** でパスワードベースキー導出（メモリ: 19456KB、時間: 2、並列度: 1）
+- 各暗号化操作で独立した初期化ベクトル（IV）を生成
+
+### 認証付き暗号化（AEAD）
+
+- 有効期限が設定されている場合、Additional Authenticated Data（AAD）として使用
+- データの完全性と真正性を保証
+- データ本体とファイルIDの両方が同じAADで保護される
+
+### セキュリティ設計
+
+- **二重暗号化**: データ本体とファイルIDを別々に暗号化
+- **プライバシー保護**: 受信後、ブラウザ履歴からURLパラメータを自動削除
+- **ゼロ知識**: サーバー側でデータ内容を知ることができない設計
+
+### リンクの構造
+
+生成されるリンクは以下の形式になります：
+
+```
+https://example.com/demo/?epayload=<base64-encoded-encrypted-file-id>#key=<key>&iv=<iv>&mode=<mode>&salt=<salt>&expdate=<expdate>
+```
+
+- `epayload`（クエリパラメータ）: 暗号化されたファイルID
+- `key`（フラグメント）: DEK（パスワード有りの場合は暗号化されたDEK）
+- `iv`（フラグメント）: ファイルID暗号化用のIV
+- `mode`（フラグメント）: 動作モード（`simple` または `cloud`、デフォルト: `simple`）
+- `salt`（フラグメント）: パスワード指定時のsalt（任意）
+- `expdate`（フラグメント）: 有効期限のISO文字列（任意）
+
+## モジュール構成
 
 * **src/index.js**
-
-  * `createShareLink`
-  * `receiveSharedData`
+  * `createShareLink` - データ共有リンクの生成
+  * `receiveSharedData` - 共有データの受信・復号
 * **src/crypto.js**
-
-  * `arrayBufferToBase64` / `base64ToArrayBuffer`
-  * `generateSalt`, `generateDek`, `generateKek`
-  * `exportKeyToString`, `importKeyFromString`
-  * `encryptData`, `decryptData`
+  * `arrayBufferToBase64` / `base64ToArrayBuffer` - Base64エンコーディング
+  * `generateSalt`, `generateDek`, `generateKek` - 暗号鍵生成
+  * `exportKeyToString`, `importKeyFromString` - 鍵の文字列変換
+  * `encryptData`, `decryptData` - AES-GCMデータ暗号化/復号
 * **src/errors.js**
-
-  * `InvalidLinkError`
-  * `ExpiredLinkError`
-  * `PasswordRequiredError`
-  * `DecryptionError`
+  * `InvalidLinkError` - 不正なリンク形式
+  * `ExpiredLinkError` - 期限切れリンク
+  * `PasswordRequiredError` - パスワード要求
+  * `DecryptionError` - 復号エラー
 * **src/url.js**
+  * `parseShareUrl` - URLパラメータ解析
 
-  * `parseShareUrl`
+## 動作モード
+
+### Simple Mode（デフォルト）
+
+- データを gzip 圧縮してから暗号化
+- 小さなテキストデータに適している
+- `uploadHandler` の戻り値をファイルIDとして扱う
+
+### Cloud Mode 
+
+- データを圧縮せずに暗号化
+- バイナリファイルや画像などに適している
+- `uploadHandler` の戻り値をファイルIDとして扱う
+
+## 処理フロー
+
+### 共有リンク生成時
+
+1. DEK（データ暗号化キー）を生成
+2. データを暗号化（Simple Modeの場合はgzip圧縮後）
+3. 暗号化データを`uploadHandler`でアップロード
+4. ファイルIDを暗号化してクエリパラメータに格納
+5. DEKと暗号化パラメータをフラグメントに格納
+6. 完成したURLを`shortenUrlHandler`で短縮
+
+### データ受信時
+
+1. URLからパラメータを解析
+2. 有効期限チェック
+3. パスワードが必要な場合は入力を求める
+4. ファイルIDを復号
+5. `downloadHandler`で暗号化データを取得
+6. データを復号（Simple Modeの場合は展開）
+7. **重要**: ブラウザ履歴からURLパラメータを削除
+
+## 重要な制約事項
+
+### ブラウザ要件
+
+- **Web Crypto API** 対応ブラウザが必要（現代的なブラウザであれば対応）
+- **HTTPS環境** が必要（Web Crypto APIの制約）
+- **WebAssembly** 対応が必要（Argon2実装のため）
+
+### サイズ制限
+
+- ブラウザのメモリ制限により、大容量ファイルの処理には注意が必要
+- Simple Modeでは追加でgzip圧縮のメモリが必要
+
+### パフォーマンス
+
+- Argon2によるパスワード導出は意図的に時間がかかる設計（セキュリティのため）
+- 大きなファイルの暗号化/復号化は時間がかかる場合があります
 
 ## ⚙️ 開発・テスト
 
@@ -110,6 +197,32 @@ Jest を使って単体テストを実行します。ブラウザAPI (Web Crypto
 ```bash
 npm test
 ```
+
+デモページをビルドするには：
+
+```bash
+npm run build
+```
+
+## トラブルシューティング
+
+### よくあるエラー
+
+- **`InvalidLinkError`**: URLが不正な形式の場合
+- **`ExpiredLinkError`**: リンクの有効期限が切れている場合
+- **`PasswordRequiredError`**: パスワードが必要だが提供されていない場合
+- **`DecryptionError`**: 復号に失敗した場合（パスワード間違いやデータ破損）
+
+### デバッグのヒント
+
+- ブラウザの開発者ツールでコンソールエラーを確認
+- HTTPS環境で実行されているか確認
+- Web Crypto APIが利用可能か確認: `console.log(!!window.crypto?.subtle)`
+
+## 🔧 依存関係
+
+- **argon2-browser** (^1.18.0) - パスワードベースキー導出
+- **pako** (^2.1.0) - gzip圧縮/展開
 
 ## 🤝 貢献
 
