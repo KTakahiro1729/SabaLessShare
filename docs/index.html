@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SabaLessShare Demo</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2em auto; padding: 0 1em; }
+        textarea, input, button { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        fieldset { border: 1px solid #ccc; padding: 1em; margin-bottom: 1em; }
+        #outputUrl { word-wrap: break-word; background: #f0f0f0; padding: 1em; }
+        #receivedData { white-space: pre-wrap; background: #e6f7ff; padding: 1em; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>SabaLessShare Demo</h1>
+
+    <!-- リンク受信時の表示エリア -->
+    <div id="receiveView" class="hidden">
+        <h2>受信データ</h2>
+        <pre id="receivedData"></pre>
+        <button onclick="window.location.href=window.location.pathname">新規作成画面に戻る</button>
+    </div>
+
+    <!-- リンク作成時の表示エリア -->
+    <div id="createView">
+        <fieldset>
+            <legend>1. 共有データ入力</legend>
+            <textarea id="data" rows="5" placeholder="共有したいテキストを入力"></textarea>
+        </fieldset>
+
+        <fieldset>
+            <legend>2. オプション</legend>
+            <label><input type="radio" name="mode" value="simple" checked> Simple Mode (短縮URL)</label><br>
+            <label><input type="radio" name="mode" value="cloud"> Cloud Mode (ファイルID)</label><br><br>
+            <input type="password" id="password" placeholder="パスワード (任意)">
+            <input type="number" id="expiresIn" placeholder="有効期限(秒) (任意)">
+        </fieldset>
+
+        <button id="createLinkBtn">3. 共有リンクを生成</button>
+
+        <fieldset>
+            <legend>生成されたURL</legend>
+            <p>このURLをコピーして、別のタブで開いてください。</p>
+            <div id="outputUrl"></div>
+        </fieldset>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
