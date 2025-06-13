@@ -10,7 +10,7 @@ import { InvalidLinkError, ExpiredLinkError, PasswordRequiredError } from './err
  * データを暗号化し、共有用の短縮URLを生成する
  * @param {{
  * data: ArrayBuffer,
- * uploadHandler: (data: ArrayBuffer) => Promise<string>,
+ * uploadHandler: (data: { ciphertext: ArrayBuffer, iv: Uint8Array }) => Promise<string>,
  * shortenUrlHandler: (url: string) => Promise<string>,
  * mode: 'simple' | 'cloud',
  * password?: string,
@@ -30,9 +30,12 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
     payloadToEncrypt = data;
   }
 
-  const { ciphertext, iv } = await encryptData(dek, payloadToEncrypt, aad);
+  const uploadData = await encryptData(dek, payloadToEncrypt, aad);
 
-  const payloadUrl = await uploadHandler(ciphertext);
+  const fileId = await uploadHandler(uploadData);
+
+  const encodedId = new TextEncoder().encode(fileId);
+  const { ciphertext: encPayload, iv } = await encryptData(dek, encodedId, aad);
 
   let salt = null;
   let keyString;
@@ -55,7 +58,9 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
   if (expdate) params.set('expdate', expdate.toISOString());
   params.set('mode', mode);
 
-  const accessURL = await shortenUrlHandler(payloadUrl);
+  const epayload = arrayBufferToBase64(encPayload);
+  const base = typeof location !== 'undefined' ? location.href.split('#')[0].split('?')[0] : '';
+  const accessURL = await shortenUrlHandler(`${base}?epayload=${encodeURIComponent(epayload)}`);
 
   return `${accessURL}#${params.toString()}`;
 }
@@ -64,7 +69,7 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
  * 共有URLからデータを復号して取得する
  * @param {{
  * location: Location,
- * downloadHandler: (url: string) => Promise<ArrayBuffer>,
+ * downloadHandler: (id: string) => Promise<{ ciphertext: ArrayBuffer, iv: Uint8Array }>,
  * passwordPromptHandler: () => Promise<string|null>
  * }} options
  * @returns {Promise<ArrayBuffer>} 復号されたデータ
@@ -73,7 +78,7 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
   const params = parseShareUrl(location);
   if (!params) throw new InvalidLinkError('Not a valid share link.');
 
-  const { payloadUrl, key, salt, expdate, iv: ivBase64, mode } = params;
+  const { key, salt, expdate, iv: ivBase64, mode } = params;
 
   if (expdate && new Date() > new Date(expdate)) {
     throw new ExpiredLinkError('This link has expired.');
@@ -94,12 +99,21 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
     dek = await importKeyFromString(key);
   }
 
-  const encryptedPayload = await downloadHandler(payloadUrl);
   const aad = expdate ? new TextEncoder().encode(expdate) : undefined;
 
-  const decryptedPayload = await decryptData(dek, {
-    ciphertext: encryptedPayload,
+  const encPayloadBuffer = base64ToArrayBuffer(params.epayload);
+  const fileIdBuffer = await decryptData(dek, {
+    ciphertext: encPayloadBuffer,
     iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
+    additionalData: aad
+  });
+  const fileId = new TextDecoder().decode(fileIdBuffer);
+
+  const downloadData = await downloadHandler(fileId);
+
+  const decryptedPayload = await decryptData(dek, {
+    ciphertext: downloadData.ciphertext,
+    iv: downloadData.iv,
     additionalData: aad
   });
 

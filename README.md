@@ -34,8 +34,8 @@ import { createShareLink, receiveSharedData } from 'saba-less-share';
 #### オプション
 
 * `data: ArrayBuffer` — 共有したいバイナリデータ
-* `uploadHandler: (data: ArrayBuffer) => Promise<string>` — 暗号化したペイロードをアップロードし、ファイルのURLを返す関数
-* `shortenUrlHandler: (url: string) => Promise<string>` — ペイロードURLを短縮し、短縮URLを返す関数
+* `uploadHandler: (data: { ciphertext: ArrayBuffer, iv: Uint8Array }) => Promise<string>` — 暗号化したデータをアップロードし、ファイルIDを返す関数
+* `shortenUrlHandler: (url: string) => Promise<string>` — `epayload` をクエリに含むURLを短縮する関数
 * `password?: string` — （任意）DEKを暗号化するパスワード
 * `expiresIn?: number` — （任意）リンクの有効期限（ミリ秒単位）
 
@@ -63,7 +63,7 @@ console.log(link);
 #### オプション
 
 * `location: Location` — 通常は `window.location`
-* `downloadHandler: (url: string) => Promise<ArrayBuffer>` — ペイロードをダウンロードして ArrayBuffer を返す関数
+* `downloadHandler: (id: string) => Promise<{ ciphertext: ArrayBuffer, iv: Uint8Array }>` — ファイルIDから暗号化データを取得する関数
 * `passwordPromptHandler: () => Promise<string|null>` — パスワードを入力させる関数。入力なければ `null`
 
 #### 戻り値
