@@ -38,13 +38,13 @@ import { createShareLink, receiveSharedData } from 'saba-less-share';
 * `data: ArrayBuffer` — 共有したいバイナリデータ
 * `mode: 'simple' | 'cloud'` — 動作モード（デフォルト: `'simple'`）。`simple`では gzip 圧縮してから暗号化、`cloud`では生データを暗号化
 * `uploadHandler: (data: { ciphertext: ArrayBuffer, iv: Uint8Array }) => Promise<string>` — 暗号化したデータをアップロードし、ファイルIDまたはURLを返す関数
-* `shortenUrlHandler: (url: string) => Promise<string>` — `epayload` をクエリに含むURLを短縮する関数
+* `shortenUrlHandler: (url: string) => Promise<string>` — `p` クエリを含むURLを短縮する関数
 * `password?: string` — （任意）KEKを生成するためのパスワード。指定すると、DEKがパスワードベースで暗号化される
-* `expiresIn?: number` — （任意）リンクの有効期限（ミリ秒単位）。設定しない場合無期限。
+* `expiresInDays?: number` — （任意）リンクの有効期限（日数単位）。設定しない場合無期限。
 
 #### 戻り値
 
-* `Promise<string>` — 完成した共有URL（`#key=…&iv=…&salt=…&expdate=…&mode=…` を含む）
+* `Promise<string>` — 完成した共有URL（`#k=…&i=…&s=…&x=…&m=…` を含む）
 
 #### サンプル
 
@@ -55,7 +55,7 @@ const link = await createShareLink({
   uploadHandler: uploadToServer,
   shortenUrlHandler: shortenWithService,
   password: 'mySecret',
-  expiresIn: 24 * 60 * 60 * 1000, // 1日
+  expiresInDays: 1, // 1日
 });
 console.log(link);
 ```
@@ -102,7 +102,7 @@ const data = await receiveSharedData({
 - `data: ArrayBuffer` — 保存するデータ
 - `adapter: storageAdapter` — ストレージ操作を実装したオブジェクト
 - `password?: string` — パスワード指定時、DEKを暗号化
-- `expiresIn?: number` — リンクの有効期限 (ms)
+- `expiresInDays?: number` — リンクの有効期限 (日数)
 
 戻り値は `{ shareLink, pointerFileId, key, salt }`。
 
@@ -146,15 +146,15 @@ const data = await receiveSharedData({
 生成されるリンクは以下の形式になります：
 
 ```
-https://example.com/demo/?epayload=<base64-encoded-encrypted-file-id>#key=<key>&iv=<iv>&mode=<mode>&salt=<salt>&expdate=<expdate>
+https://example.com/demo/?p=<base64-encoded-encrypted-file-id>#k=<key>&i=<iv>&m=<mode>&s=<salt>&x=<expdate>
 ```
 
-- `epayload`（クエリパラメータ）: 暗号化されたファイルID
-- `key`（フラグメント）: DEK（パスワード有りの場合は暗号化されたDEK）
-- `iv`（フラグメント）: ファイルID暗号化用のIV
-- `mode`（フラグメント）: 動作モード（`simple` または `cloud`、デフォルト: `simple`）
-- `salt`（フラグメント）: パスワード指定時のsalt（任意）
-- `expdate`（フラグメント）: 有効期限のISO文字列（任意）
+- `p`（クエリパラメータ）: 暗号化されたファイルID
+- `k`（フラグメント）: DEK（パスワード有りの場合は暗号化されたDEK）
+- `i`（フラグメント）: ファイルID暗号化用のIV
+- `m`（フラグメント）: 動作モード（`s` / `c` / `d`）
+- `s`（フラグメント）: パスワード指定時のsalt（任意）
+- `x`（フラグメント）: 有効期限 (`YYYY-MM-DD`)（任意）
 
 ## モジュール構成
 
@@ -184,8 +184,8 @@ https://example.com/demo/?epayload=<base64-encoded-encrypted-file-id>#key=<key>&
 - 小さなテキストデータに適している
 - `uploadHandler` の戻り値をファイルIDとして扱う
 
-Simple Modeでは暗号化済みIDをBase64化した`epayload`をURLに直接埋め込みます。
-この`epayload`はURLエンコード前でおよそ**7500文字**までに制限されています。
+Simple Modeでは暗号化済みIDをBase64化した`p`クエリに直接埋め込みます。
+この`p`値はURLエンコード前でおよそ**7500文字**までに制限されています。
 それ以上のデータを扱う場合はCloud Modeの利用を検討してください。
 以下は圧縮前のデータサイズと上限の関係を示したおおよその目安です（実際の圧縮率はデータ内容によって大きく変動します）。
 

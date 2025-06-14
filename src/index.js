@@ -17,14 +17,15 @@ const SIMPLE_MODE_PAYLOAD_LIMIT = 7500;
  * shortenUrlHandler: (url: string) => Promise<string>,
  * mode: 'simple' | 'cloud',
  * password?: string,
- * expiresIn?: number
+ * expiresInDays?: number
  * }} options
  * @returns {Promise<string>} 最終的な共有URL
  */
-export async function createShareLink({ data, mode, uploadHandler, shortenUrlHandler, password, expiresIn }) {
+export async function createShareLink({ data, mode, uploadHandler, shortenUrlHandler, password, expiresInDays }) {
   const dek = await generateDek();
-  const expdate = expiresIn ? new Date(Date.now() + expiresIn) : null;
-  const aad = expdate ? new TextEncoder().encode(expdate.toISOString()) : undefined;
+  const expdate = Number.isFinite(expiresInDays) ? new Date(Date.now() + expiresInDays * 86400000) : null;
+  const expStr = expdate ? expdate.toISOString().slice(0, 10) : null;
+  const aad = expStr ? new TextEncoder().encode(expStr) : undefined;
 
   let payloadToEncrypt;
   if (mode === 'simple') {
@@ -54,12 +55,13 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
   }
 
   const params = new URLSearchParams({
-    iv: arrayBufferToBase64(iv),
-    key: keyString
+    i: arrayBufferToBase64(iv),
+    k: keyString
   });
-  if (salt) params.set('salt', arrayBufferToBase64(salt));
-  if (expdate) params.set('expdate', expdate.toISOString());
-  params.set('mode', mode);
+  if (salt) params.set('s', arrayBufferToBase64(salt));
+  if (expStr) params.set('x', expStr);
+  const modeMap = { simple: 's', cloud: 'c' };
+  params.set('m', modeMap[mode] || 's');
 
   const epayload = arrayBufferToBase64(encPayload);
 
@@ -68,7 +70,7 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
   }
 
   const base = typeof location !== 'undefined' ? location.href.split('#')[0].split('?')[0] : '';
-  const accessURL = await shortenUrlHandler(`${base}?epayload=${encodeURIComponent(epayload)}`);
+  const accessURL = await shortenUrlHandler(`${base}?p=${encodeURIComponent(epayload)}`);
 
   return `${accessURL}#${params.toString()}`;
 }
@@ -89,7 +91,7 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
 
   const { key, salt, expdate, iv: ivBase64, mode } = params;
 
-  if (expdate && new Date() > new Date(expdate)) {
+  if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
     throw new ExpiredLinkError('This link has expired.');
   }
 

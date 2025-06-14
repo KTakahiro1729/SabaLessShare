@@ -47,6 +47,12 @@ describe('Dynamic Sharing API', () => {
 
     const result = await createDynamicLink({ data: data.buffer, adapter });
 
+    expect(result.shareLink).toContain('?p=');
+    expect(result.shareLink).toContain('#');
+    expect(result.shareLink).toMatch(/k=[^&]+/);
+    expect(result.shareLink).toMatch(/i=[^&]+/);
+    expect(result.shareLink).toMatch(/m=d/);
+
     expect(adapter.create).toHaveBeenCalledTimes(2);
 
     const location = new URL(result.shareLink);
@@ -60,6 +66,12 @@ describe('Dynamic Sharing API', () => {
     const data = new TextEncoder().encode('secure data');
 
     const result = await createDynamicLink({ data: data.buffer, adapter, password });
+
+    expect(result.shareLink).toContain('?p=');
+    expect(result.shareLink).toContain('#');
+    expect(result.shareLink).toMatch(/k=[^&]+/);
+    expect(result.shareLink).toMatch(/i=[^&]+/);
+    expect(result.shareLink).toMatch(/m=d/);
 
     const location = new URL(result.shareLink);
     const received = await receiveDynamicData({ location, adapter, passwordPromptHandler: async () => password });

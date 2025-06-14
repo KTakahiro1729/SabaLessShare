@@ -100,8 +100,8 @@ function handleCreate() {
         const data = new TextEncoder().encode(dataText);
         const mode = document.querySelector('input[name="mode"]:checked').value;
         const password = document.getElementById('password').value || undefined;
-        const expiresInSeconds = document.getElementById('expiresIn').value;
-        const expiresIn = expiresInSeconds ? parseInt(expiresInSeconds, 10) * 1000 : undefined;
+        const expiresInDaysVal = document.getElementById('expiresInDays').value;
+        const expiresInDays = expiresInDaysVal ? parseInt(expiresInDaysVal, 10) : undefined;
         
         try {
             outputUrlEl.textContent = "生成中...";
@@ -111,7 +111,7 @@ function handleCreate() {
                 uploadHandler,
                 shortenUrlHandler,
                 password,
-                expiresIn,
+                expiresInDays,
             });
             outputUrlEl.innerHTML = `<a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>`;
         } catch(e) {
