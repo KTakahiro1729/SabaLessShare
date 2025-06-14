@@ -41,6 +41,7 @@ import { createShareLink, receiveSharedData } from 'saba-less-share';
 * `shortenUrlHandler: (url: string) => Promise<string>` — `p` クエリを含むURLを短縮する関数
 * `password?: string` — （任意）KEKを生成するためのパスワード。指定すると、DEKがパスワードベースで暗号化される
 * `expiresInDays?: number` — （任意）リンクの有効期限（日数単位）。設定しない場合無期限。
+* `simpleModePayloadLimit?: number` — （任意）Simpleモードで許可するペイロード長の上限。デフォルトは7700文字。
 
 #### 戻り値
 
@@ -185,7 +186,7 @@ https://example.com/demo/?p=<base64-encoded-encrypted-file-id>#k=<key>&i=<iv>&m=
 - `uploadHandler` の戻り値をファイルIDとして扱う
 
 Simple Modeでは暗号化済みIDをBase64化した`p`クエリに直接埋め込みます。
-この`p`値はURLエンコード前でおよそ**7500文字**までに制限されています。
+この`p`値はURLエンコード前でおよそ**7700文字**までに制限されています。
 それ以上のデータを扱う場合はCloud Modeの利用を検討してください。
 以下は圧縮前のデータサイズと上限の関係を示したおおよその目安です（実際の圧縮率はデータ内容によって大きく変動します）。
 

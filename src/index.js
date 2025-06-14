@@ -7,7 +7,7 @@ import { parseShareUrl } from './url.js';
 import { InvalidLinkError, ExpiredLinkError, PasswordRequiredError, PayloadTooLargeError } from './errors.js';
 
 // URL length safety limit for simple mode's epayload (pre-encoding)
-const SIMPLE_MODE_PAYLOAD_LIMIT = 7500;
+const DEFAULT_SIMPLE_MODE_PAYLOAD_LIMIT = 7700;
 
 /**
  * データを暗号化し、共有用の短縮URLを生成する
@@ -17,11 +17,20 @@ const SIMPLE_MODE_PAYLOAD_LIMIT = 7500;
  * shortenUrlHandler: (url: string) => Promise<string>,
  * mode: 'simple' | 'cloud',
  * password?: string,
- * expiresInDays?: number
+ * expiresInDays?: number,
+ * simpleModePayloadLimit?: number
  * }} options
  * @returns {Promise<string>} 最終的な共有URL
  */
-export async function createShareLink({ data, mode, uploadHandler, shortenUrlHandler, password, expiresInDays }) {
+export async function createShareLink({
+  data,
+  mode,
+  uploadHandler,
+  shortenUrlHandler,
+  password,
+  expiresInDays,
+  simpleModePayloadLimit = DEFAULT_SIMPLE_MODE_PAYLOAD_LIMIT
+}) {
   const dek = await generateDek();
   const expdate = Number.isFinite(expiresInDays) ? new Date(Date.now() + expiresInDays * 86400000) : null;
   const expStr = expdate ? expdate.toISOString().slice(0, 10) : null;
@@ -65,7 +74,7 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
 
   const epayload = arrayBufferToBase64(encPayload);
 
-  if (mode === 'simple' && epayload.length > SIMPLE_MODE_PAYLOAD_LIMIT) {
+  if (mode === 'simple' && epayload.length > simpleModePayloadLimit) {
     throw new PayloadTooLargeError('Payload too large for simple mode. Please use Cloud Mode instead.');
   }
 

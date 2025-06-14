@@ -102,6 +102,8 @@ function handleCreate() {
         const password = document.getElementById('password').value || undefined;
         const expiresInDaysVal = document.getElementById('expiresInDays').value;
         const expiresInDays = expiresInDaysVal ? parseInt(expiresInDaysVal, 10) : undefined;
+        const payloadLimitVal = document.getElementById('payloadLimit').value;
+        const simpleModePayloadLimit = payloadLimitVal ? parseInt(payloadLimitVal, 10) : undefined;
         
         try {
             outputUrlEl.textContent = "生成中...";
@@ -112,6 +114,7 @@ function handleCreate() {
                 shortenUrlHandler,
                 password,
                 expiresInDays,
+                simpleModePayloadLimit,
             });
             outputUrlEl.innerHTML = `<a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>`;
         } catch(e) {
