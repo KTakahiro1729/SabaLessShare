@@ -9,9 +9,9 @@ Simpleモードがテストできる実装サンプルはdocsフォルダに実�
 本パッケージはまだ npm に公開されていません。GitHub からインストールできます。
 
 ```bash
-npm install git+https://github.com/<ユーザー名>/saba-less-share.git
+npm install git+https://github.com/KTakahiro1729/saba-less-share.git
 # または
-yarn add https://github.com/<ユーザー名>/saba-less-share.git
+yarn add https://github.com/KTakahiro1729/saba-less-share.git
 ```
 
 ローカルの開発版をリンクして試すには:
