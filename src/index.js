@@ -23,8 +23,9 @@ const SIMPLE_MODE_PAYLOAD_LIMIT = 7500;
  */
 export async function createShareLink({ data, mode, uploadHandler, shortenUrlHandler, password, expiresIn }) {
   const dek = await generateDek();
-  const expdate = expiresIn ? new Date(Date.now() + expiresIn) : null;
-  const aad = expdate ? new TextEncoder().encode(expdate.toISOString()) : undefined;
+  const exp = expiresIn ? new Date(Date.now() + expiresIn) : null;
+  const expdate = exp ? exp.toISOString().slice(0, 10) : null;
+  const aad = expdate ? new TextEncoder().encode(expdate) : undefined;
 
   let payloadToEncrypt;
   if (mode === 'simple') {
@@ -58,7 +59,7 @@ export async function createShareLink({ data, mode, uploadHandler, shortenUrlHan
     key: keyString
   });
   if (salt) params.set('salt', arrayBufferToBase64(salt));
-  if (expdate) params.set('expdate', expdate.toISOString());
+  if (expdate) params.set('expdate', expdate);
   params.set('mode', mode);
 
   const epayload = arrayBufferToBase64(encPayload);
@@ -89,8 +90,11 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
 
   const { key, salt, expdate, iv: ivBase64, mode } = params;
 
-  if (expdate && new Date() > new Date(expdate)) {
-    throw new ExpiredLinkError('This link has expired.');
+  if (expdate) {
+    const expiryEnd = new Date(`${expdate}T23:59:59.999Z`);
+    if (new Date() > expiryEnd) {
+      throw new ExpiredLinkError('This link has expired.');
+    }
   }
 
   let dek;

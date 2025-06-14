@@ -154,7 +154,7 @@ https://example.com/demo/?epayload=<base64-encoded-encrypted-file-id>#key=<key>&
 - `iv`（フラグメント）: ファイルID暗号化用のIV
 - `mode`（フラグメント）: 動作モード（`simple` または `cloud`、デフォルト: `simple`）
 - `salt`（フラグメント）: パスワード指定時のsalt（任意）
-- `expdate`（フラグメント）: 有効期限のISO文字列（任意）
+- `expdate`（フラグメント）: 有効期限の `YYYY-MM-DD` 形式の日付文字列（任意、UTCで解釈）
 
 ## モジュール構成
 

@@ -91,16 +91,16 @@ describe('SabaLessShare Integration Tests', () => {
     });
 
     it('期限切れリンクでエラーをスローすること', async () => {
+        jest.useFakeTimers().setSystemTime(new Date('2025-06-15T00:00:00Z'));
         const link = await createShareLink({
             data: originalData,
             mode: 'simple',
             uploadHandler: (data) => mockUploadHandler(data, 'simple'),
             shortenUrlHandler: mockShortenUrlHandler,
-            expiresIn: 1, // 1ミリ秒
+            expiresIn: 1,
         });
 
-        // 意図的に待機
-        await new Promise(resolve => setTimeout(resolve, 10));
+        jest.setSystemTime(new Date('2025-06-16T00:00:00Z'));
 
         const mockLocation = new URL(link);
 
@@ -109,6 +109,38 @@ describe('SabaLessShare Integration Tests', () => {
             downloadHandler: mockDownloadHandler,
             passwordPromptHandler: async () => null,
         })).rejects.toThrow('This link has expired.');
+        jest.useRealTimers();
+    });
+
+    it('有効期限日の終わりまではリンクが有効であること', async () => {
+        jest.useFakeTimers().setSystemTime(new Date('2025-06-14T00:00:00Z'));
+        const link = await createShareLink({
+            data: originalData,
+            mode: 'simple',
+            uploadHandler: (data) => mockUploadHandler(data, 'simple'),
+            shortenUrlHandler: mockShortenUrlHandler,
+            expiresIn: 24 * 60 * 60 * 1000, // 次の日が有効期限
+        });
+
+        const mockLocation = new URL(link);
+
+        // 有効期限日の終わりまでは成功する
+        jest.setSystemTime(new Date('2025-06-15T23:59:59Z'));
+        const received = await receiveSharedData({
+            location: mockLocation,
+            downloadHandler: mockDownloadHandler,
+            passwordPromptHandler: async () => null,
+        });
+        expect(new TextDecoder().decode(received)).toBe(originalText);
+
+        // 翌日の開始時点で期限切れ
+        jest.setSystemTime(new Date('2025-06-16T00:00:00Z'));
+        await expect(receiveSharedData({
+            location: mockLocation,
+            downloadHandler: mockDownloadHandler,
+            passwordPromptHandler: async () => null,
+        })).rejects.toThrow('This link has expired.');
+        jest.useRealTimers();
     });
 
     it('simpleモードでペイロードが大きすぎる場合にエラーをスローすること', async () => {

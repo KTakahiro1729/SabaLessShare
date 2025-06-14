@@ -95,7 +95,8 @@ export async function createDynamicLink({ data, adapter, password, expiresIn }) 
   const params = new URLSearchParams({ iv: arrayBufferToBase64(iv), key: keyString, mode: 'dynamic' });
   if (salt) params.set('salt', arrayBufferToBase64(salt));
   if (expiresIn) {
-    const expdate = new Date(Date.now() + expiresIn).toISOString();
+    const exp = new Date(Date.now() + expiresIn);
+    const expdate = exp.toISOString().slice(0, 10);
     params.set('expdate', expdate);
   }
 
@@ -129,8 +130,11 @@ export async function receiveDynamicData({ location, adapter, passwordPromptHand
     if (!params || params.mode !== 'dynamic') throw new InvalidLinkError('Not a valid dynamic share link.');
 
     const { key, salt, iv, expdate } = params;
-    if (expdate && new Date() > new Date(expdate)) {
-      throw new ExpiredLinkError('This link has expired.');
+    if (expdate) {
+      const expiryEnd = new Date(`${expdate}T23:59:59.999Z`);
+      if (new Date() > expiryEnd) {
+        throw new ExpiredLinkError('This link has expired.');
+      }
     }
 
     let password = null;
