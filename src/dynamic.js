@@ -50,11 +50,11 @@ async function _reconstructDek(key, salt, password) {
  *   data: ArrayBuffer,
  *   adapter: StorageAdapter,
  *   password?: string,
- *   expiresIn?: number
+ *   expiresInDays?: number
  * }} options
  * @returns {Promise<{shareLink: string, pointerFileId: string, key: string, salt: string|null}>}
  */
-export async function createDynamicLink({ data, adapter, password, expiresIn }) {
+export async function createDynamicLink({ data, adapter, password, expiresInDays }) {
   if (!data) throw new Error("Missing required option 'data'");
   if (!adapter || typeof adapter.create !== 'function') {
     throw new Error("Missing required option 'adapter' with 'create' method");
@@ -92,16 +92,16 @@ export async function createDynamicLink({ data, adapter, password, expiresIn }) 
     keyString = await exportKeyToString(dek);
   }
 
-  const params = new URLSearchParams({ iv: arrayBufferToBase64(iv), key: keyString, mode: 'dynamic' });
-  if (salt) params.set('salt', arrayBufferToBase64(salt));
-  if (expiresIn) {
-    const expdate = new Date(Date.now() + expiresIn).toISOString();
-    params.set('expdate', expdate);
+  const params = new URLSearchParams({ i: arrayBufferToBase64(iv), k: keyString, m: 'd' });
+  if (salt) params.set('s', arrayBufferToBase64(salt));
+  if (Number.isFinite(expiresInDays)) {
+    const expdate = new Date(Date.now() + expiresInDays * 86400000).toISOString().slice(0,10);
+    params.set('x', expdate);
   }
 
   const epayload = arrayBufferToBase64(encPayload);
   const base = typeof location !== 'undefined' ? location.href.split('#')[0].split('?')[0] : '';
-  const shareLink = `${base}?epayload=${encodeURIComponent(epayload)}#${params.toString()}`;
+  const shareLink = `${base}?p=${encodeURIComponent(epayload)}#${params.toString()}`;
 
   return { shareLink, pointerFileId, key: keyString, salt: salt ? arrayBufferToBase64(salt) : null };
 }

@@ -74,8 +74,14 @@ describe('SabaLessShare Integration Tests', () => {
             uploadHandler: (data) => mockUploadHandler(data, mode),
             shortenUrlHandler: mockShortenUrlHandler,
             password: usePass ? password : undefined,
-            expiresIn: useExpiry ? 3600 * 1000 : undefined,
+            expiresInDays: useExpiry ? 1 : undefined,
         });
+
+        expect(link).toContain('?p=');
+        expect(link).toContain('#');
+        expect(link).toMatch(/k=[^&]+/);
+        expect(link).toMatch(/i=[^&]+/);
+        expect(link).toMatch(/m=[sc]/);
 
         // 2. 受信シミュレーション
         const mockLocation = new URL(link);
@@ -96,7 +102,7 @@ describe('SabaLessShare Integration Tests', () => {
             mode: 'simple',
             uploadHandler: (data) => mockUploadHandler(data, 'simple'),
             shortenUrlHandler: mockShortenUrlHandler,
-            expiresIn: 1, // 1ミリ秒
+            expiresInDays: -1,
         });
 
         // 意図的に待機

@@ -6,20 +6,23 @@
 export function parseShareUrl(location) {
   const fragmentParams = new URLSearchParams(location.hash.substring(1));
 
-  const key = fragmentParams.get('key');
-  const iv = fragmentParams.get('iv');
+  const key = fragmentParams.get('k');
+  const iv = fragmentParams.get('i');
   if (!key || !iv) {
     return null;
   }
 
   const queryParams = new URLSearchParams(location.search);
 
+  const modeMap = { s: 'simple', c: 'cloud', d: 'dynamic' };
+  const modeCode = fragmentParams.get('m') || 's';
+
   return {
-    mode: fragmentParams.get('mode') || 'simple',
-    salt: fragmentParams.get('salt') || null,
-    expdate: fragmentParams.get('expdate') || null,
+    mode: modeMap[modeCode] || 'simple',
+    salt: fragmentParams.get('s') || null,
+    expdate: fragmentParams.get('x') || null,
     key: key,
     iv: iv,
-    epayload: queryParams.get('epayload') || '',
+    epayload: queryParams.get('p') || '',
   };
 }
