@@ -129,7 +129,7 @@ export async function receiveDynamicData({ location, adapter, passwordPromptHand
     if (!params || params.mode !== 'dynamic') throw new InvalidLinkError('Not a valid dynamic share link.');
 
     const { key, salt, iv, expdate } = params;
-    if (expdate && new Date() > new Date(expdate)) {
+    if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
       throw new ExpiredLinkError('This link has expired.');
     }
 

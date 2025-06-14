@@ -117,6 +117,77 @@ describe('SabaLessShare Integration Tests', () => {
         })).rejects.toThrow('This link has expired.');
     });
 
+    it('旧形式のURLでも復号できること', async () => {
+        const link = await createShareLink({
+            data: originalData,
+            mode: 'simple',
+            uploadHandler: (data) => mockUploadHandler(data, 'simple'),
+            shortenUrlHandler: mockShortenUrlHandler,
+            password: password,
+            expiresInDays: 1,
+        });
+
+        const urlObj = new URL(link);
+        const qp = urlObj.searchParams;
+        qp.set('epayload', qp.get('p'));
+        qp.delete('p');
+        urlObj.search = '?' + qp.toString();
+
+        const fp = new URLSearchParams(urlObj.hash.substring(1));
+        fp.set('key', fp.get('k'));
+        fp.delete('k');
+        fp.set('iv', fp.get('i'));
+        fp.delete('i');
+        if (fp.has('s')) {
+            fp.set('salt', fp.get('s'));
+            fp.delete('s');
+        }
+        if (fp.has('x')) {
+            fp.set('expdate', fp.get('x'));
+            fp.delete('x');
+        }
+        fp.set('mode', fp.get('m') === 'c' ? 'cloud' : 'simple');
+        fp.delete('m');
+        urlObj.hash = '#' + fp.toString();
+        const oldLink = urlObj.toString();
+
+        const mockLocation = new URL(oldLink);
+        const received = await receiveSharedData({
+            location: mockLocation,
+            downloadHandler: mockDownloadHandler,
+            passwordPromptHandler: async () => password,
+        });
+        expect(new TextDecoder().decode(received)).toBe(originalText);
+    });
+
+    it('有効期限の境界値を正しく判定すること', async () => {
+        const link = await createShareLink({
+            data: originalData,
+            mode: 'simple',
+            uploadHandler: (data) => mockUploadHandler(data, 'simple'),
+            shortenUrlHandler: mockShortenUrlHandler,
+            expiresInDays: 0,
+        });
+        const expdate = new URLSearchParams(new URL(link).hash.substring(1)).get('x');
+
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date(expdate + 'T23:59:59.999Z'));
+        const received = await receiveSharedData({
+            location: new URL(link),
+            downloadHandler: mockDownloadHandler,
+            passwordPromptHandler: async () => null,
+        });
+        expect(new TextDecoder().decode(received)).toBe(originalText);
+
+        jest.setSystemTime(new Date(new Date(expdate + 'T23:59:59.999Z').getTime() + 1));
+        await expect(receiveSharedData({
+            location: new URL(link),
+            downloadHandler: mockDownloadHandler,
+            passwordPromptHandler: async () => null,
+        })).rejects.toThrow('This link has expired.');
+        jest.useRealTimers();
+    });
+
     it('simpleモードでペイロードが大きすぎる場合にエラーをスローすること', async () => {
         const bigData = crypto.getRandomValues(new Uint8Array(10000));
         const bigUploadHandler = async () => 'x'.repeat(8000);
