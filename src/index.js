@@ -100,15 +100,16 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
     if (!params) throw new InvalidLinkError('Not a valid share link.');
 
     const { key, salt, expdate, iv: ivBase64, mode } = params;
+    if (mode === 'cloud') {
+      if (typeof downloadHandler !== 'function') {
+        throw new Error('downloadHandler is required for cloud mode');
+      }
+    }
 
     const queryParams = new URLSearchParams(location.search);
 
-    if (mode === 'cloud') {
-      if (!params.epayload) {
-        throw new InvalidLinkError(`Invalid ${mode} mode link: missing data parameter`);
-      }
-    } else if (!queryParams.get('data') && !queryParams.get('p') && !queryParams.get('epayload')) {
-      throw new InvalidLinkError('Invalid simple mode link.');
+    if (!params.epayload) {
+      throw new InvalidLinkError(`Invalid ${mode} mode link: missing data parameter`);
     }
 
     if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
