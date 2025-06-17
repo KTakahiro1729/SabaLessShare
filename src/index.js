@@ -99,69 +99,66 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
     const params = parseShareUrl(location);
     if (!params) throw new InvalidLinkError('Not a valid share link.');
 
-  const { key, salt, expdate, iv: ivBase64, mode } = params;
+    const { key, salt, expdate, iv: ivBase64, mode } = params;
 
-  const queryParams = new URLSearchParams(location.search);
+    const queryParams = new URLSearchParams(location.search);
 
-  if (mode === 'cloud') {
-    if (typeof downloadHandler !== 'function') {
-      throw new Error('downloadHandler is required for cloud mode');
+    if (mode === 'cloud') {
+      if (!params.epayload) {
+        throw new InvalidLinkError(`Invalid ${mode} mode link: missing data parameter`);
+      }
+    } else if (!queryParams.get('data') && !queryParams.get('p') && !queryParams.get('epayload')) {
+      throw new InvalidLinkError('Invalid simple mode link.');
     }
-    if (!queryParams.get('p') && !queryParams.get('epayload')) {
-      throw new InvalidLinkError('Invalid cloud mode link.');
+
+    if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
+      throw new ExpiredLinkError('This link has expired.');
     }
-  } else if (!queryParams.get('data') && !queryParams.get('p') && !queryParams.get('epayload')) {
-    throw new InvalidLinkError('Invalid simple mode link.');
-  }
 
-  if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
-    throw new ExpiredLinkError('This link has expired.');
-  }
+    let dek;
+    if (salt) {
+      const password = await passwordPromptHandler();
+      if (!password) throw new PasswordRequiredError('Password is required but was not provided.');
+      const kek = await generateKek(password, new Uint8Array(base64ToArrayBuffer(salt)));
+      const [encCipher, encIv] = key.split('.');
+      const rawDek = await decryptData(kek, {
+        ciphertext: base64ToArrayBuffer(encCipher),
+        iv: new Uint8Array(base64ToArrayBuffer(encIv))
+      });
+      dek = await crypto.subtle.importKey('raw', rawDek, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+    } else {
+      dek = await importKeyFromString(key);
+    }
 
-  let dek;
-  if (salt) {
-    const password = await passwordPromptHandler();
-    if (!password) throw new PasswordRequiredError('Password is required but was not provided.');
-    const kek = await generateKek(password, new Uint8Array(base64ToArrayBuffer(salt)));
-    const [encCipher, encIv] = key.split('.');
-    const rawDek = await decryptData(kek, {
-      ciphertext: base64ToArrayBuffer(encCipher),
-      iv: new Uint8Array(base64ToArrayBuffer(encIv))
-    });
-    dek = await crypto.subtle.importKey('raw', rawDek, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
-  } else {
-    dek = await importKeyFromString(key);
-  }
+    const aad = expdate ? new TextEncoder().encode(expdate) : undefined;
 
-  const aad = expdate ? new TextEncoder().encode(expdate) : undefined;
+    const encPayloadBuffer = base64ToArrayBuffer(params.epayload);
 
-  const encPayloadBuffer = base64ToArrayBuffer(params.epayload);
+    if (mode === 'simple') {
+      const decryptedPayload = await decryptData(dek, {
+        ciphertext: encPayloadBuffer,
+        iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
+        additionalData: aad,
+      });
+      return pako.ungzip(new Uint8Array(decryptedPayload)).buffer;
+    }
 
-  if (mode === 'simple') {
-    const decryptedPayload = await decryptData(dek, {
+    const fileIdBuffer = await decryptData(dek, {
       ciphertext: encPayloadBuffer,
       iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
       additionalData: aad,
     });
-    return pako.ungzip(new Uint8Array(decryptedPayload)).buffer;
-  }
+    const fileId = new TextDecoder().decode(fileIdBuffer);
 
-  const fileIdBuffer = await decryptData(dek, {
-    ciphertext: encPayloadBuffer,
-    iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
-    additionalData: aad,
-  });
-  const fileId = new TextDecoder().decode(fileIdBuffer);
+    const downloadData = await downloadHandler(fileId);
 
-  const downloadData = await downloadHandler(fileId);
+    const decryptedPayload = await decryptData(dek, {
+      ciphertext: downloadData.ciphertext,
+      iv: downloadData.iv,
+      additionalData: aad,
+    });
 
-  const decryptedPayload = await decryptData(dek, {
-    ciphertext: downloadData.ciphertext,
-    iv: downloadData.iv,
-    additionalData: aad,
-  });
-
-  return decryptedPayload;
+    return decryptedPayload;
   } finally {
     if (typeof history !== 'undefined') {
       const base = location.href.split('#')[0].split('?')[0];
