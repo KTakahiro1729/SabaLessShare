@@ -189,4 +189,78 @@ describe('SabaLessShare Integration Tests', () => {
             shortenUrlHandler: mockShortenUrlHandler,
         })).rejects.toThrow(PayloadTooLargeError);
     });
+
+    it('simpleモードではuploadHandlerとdownloadHandlerが呼び出されないこと', async () => {
+        const uploadSpy = jest.fn(mockUploadHandler);
+        const downloadSpy = jest.fn(mockDownloadHandler);
+
+        const link = await createShareLink({
+            data: originalData,
+            mode: 'simple',
+            uploadHandler: uploadSpy,
+            shortenUrlHandler: mockShortenUrlHandler,
+        });
+
+        expect(uploadSpy).not.toHaveBeenCalled();
+
+        await receiveSharedData({
+            location: new URL(link),
+            downloadHandler: downloadSpy,
+            passwordPromptHandler: async () => null,
+        });
+
+        expect(downloadSpy).not.toHaveBeenCalled();
+    });
+
+    it('cloudモードではuploadHandlerとdownloadHandlerが1回ずつ呼び出されること', async () => {
+        const uploadSpy = jest.fn(mockUploadHandler);
+        const downloadSpy = jest.fn(mockDownloadHandler);
+
+        const link = await createShareLink({
+            data: originalData,
+            mode: 'cloud',
+            uploadHandler: uploadSpy,
+            shortenUrlHandler: mockShortenUrlHandler,
+        });
+
+        expect(uploadSpy).toHaveBeenCalledTimes(1);
+
+        await receiveSharedData({
+            location: new URL(link),
+            downloadHandler: downloadSpy,
+            passwordPromptHandler: async () => null,
+        });
+
+        expect(downloadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('simpleモードではdownloadHandler未定義でも動作すること', async () => {
+        const link = await createShareLink({
+            data: originalData,
+            mode: 'simple',
+            uploadHandler: jest.fn(),
+            shortenUrlHandler: mockShortenUrlHandler,
+        });
+
+        const received = await receiveSharedData({
+            location: new URL(link),
+            passwordPromptHandler: async () => null,
+        });
+
+        expect(new TextDecoder().decode(received)).toBe(originalText);
+    });
+
+    it('cloudモードでdownloadHandler未定義時にエラーをスローすること', async () => {
+        const link = await createShareLink({
+            data: originalData,
+            mode: 'cloud',
+            uploadHandler: jest.fn(mockUploadHandler),
+            shortenUrlHandler: mockShortenUrlHandler,
+        });
+
+        await expect(receiveSharedData({
+            location: new URL(link),
+            passwordPromptHandler: async () => null,
+        })).rejects.toThrow('downloadHandler is required for cloud mode');
+    });
 });

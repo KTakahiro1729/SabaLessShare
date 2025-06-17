@@ -101,6 +101,19 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
 
   const { key, salt, expdate, iv: ivBase64, mode } = params;
 
+  const queryParams = new URLSearchParams(location.search);
+
+  if (mode === 'cloud') {
+    if (typeof downloadHandler !== 'function') {
+      throw new Error('downloadHandler is required for cloud mode');
+    }
+    if (!queryParams.get('p') && !queryParams.get('epayload')) {
+      throw new InvalidLinkError('Invalid cloud mode link.');
+    }
+  } else if (!queryParams.get('data') && !queryParams.get('p') && !queryParams.get('epayload')) {
+    throw new InvalidLinkError('Invalid simple mode link.');
+  }
+
   if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
     throw new ExpiredLinkError('This link has expired.');
   }
