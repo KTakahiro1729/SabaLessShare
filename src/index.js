@@ -37,18 +37,18 @@ export async function createShareLink({
   const aad = expStr ? new TextEncoder().encode(expStr) : undefined;
 
   let payloadToEncrypt;
+  let encPayload;
+  let usedIv;
   if (mode === 'simple') {
     payloadToEncrypt = pako.gzip(new Uint8Array(data)).buffer;
+    ({ ciphertext: encPayload, iv: usedIv } = await encryptData(dek, payloadToEncrypt, aad));
   } else {
     payloadToEncrypt = data;
+    const uploadData = await encryptData(dek, payloadToEncrypt, aad);
+    const fileId = await uploadHandler(uploadData);
+    const encodedId = new TextEncoder().encode(fileId);
+    ({ ciphertext: encPayload, iv: usedIv } = await encryptData(dek, encodedId, aad));
   }
-
-  const uploadData = await encryptData(dek, payloadToEncrypt, aad);
-
-  const fileId = await uploadHandler(uploadData);
-
-  const encodedId = new TextEncoder().encode(fileId);
-  const { ciphertext: encPayload, iv } = await encryptData(dek, encodedId, aad);
 
   let salt = null;
   let keyString;
@@ -64,7 +64,7 @@ export async function createShareLink({
   }
 
   const params = new URLSearchParams({
-    i: arrayBufferToBase64(iv),
+    i: arrayBufferToBase64(usedIv),
     k: keyString
   });
   if (salt) params.set('s', arrayBufferToBase64(salt));
@@ -79,7 +79,8 @@ export async function createShareLink({
   }
 
   const base = typeof location !== 'undefined' ? location.href.split('#')[0].split('?')[0] : '';
-  const accessURL = await shortenUrlHandler(`${base}?p=${encodeURIComponent(epayload)}`);
+  const paramName = mode === 'simple' ? 'data' : 'p';
+  const accessURL = await shortenUrlHandler(`${base}?${paramName}=${encodeURIComponent(epayload)}`);
 
   return `${accessURL}#${params.toString()}`;
 }
@@ -98,48 +99,65 @@ export async function receiveSharedData({ location, downloadHandler, passwordPro
     const params = parseShareUrl(location);
     if (!params) throw new InvalidLinkError('Not a valid share link.');
 
-  const { key, salt, expdate, iv: ivBase64, mode } = params;
+    const { key, salt, expdate, iv: ivBase64, mode } = params;
+    if (mode === 'cloud') {
+      if (typeof downloadHandler !== 'function') {
+        throw new Error('downloadHandler is required for cloud mode');
+      }
+    }
 
-  if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
-    throw new ExpiredLinkError('This link has expired.');
-  }
+    const queryParams = new URLSearchParams(location.search);
 
-  let dek;
-  if (salt) {
-    const password = await passwordPromptHandler();
-    if (!password) throw new PasswordRequiredError('Password is required but was not provided.');
-    const kek = await generateKek(password, new Uint8Array(base64ToArrayBuffer(salt)));
-    const [encCipher, encIv] = key.split('.');
-    const rawDek = await decryptData(kek, {
-      ciphertext: base64ToArrayBuffer(encCipher),
-      iv: new Uint8Array(base64ToArrayBuffer(encIv))
+    if (!params.epayload) {
+      throw new InvalidLinkError(`Invalid ${mode} mode link: missing data parameter`);
+    }
+
+    if (expdate && new Date() > new Date(expdate + 'T23:59:59.999Z')) {
+      throw new ExpiredLinkError('This link has expired.');
+    }
+
+    let dek;
+    if (salt) {
+      const password = await passwordPromptHandler();
+      if (!password) throw new PasswordRequiredError('Password is required but was not provided.');
+      const kek = await generateKek(password, new Uint8Array(base64ToArrayBuffer(salt)));
+      const [encCipher, encIv] = key.split('.');
+      const rawDek = await decryptData(kek, {
+        ciphertext: base64ToArrayBuffer(encCipher),
+        iv: new Uint8Array(base64ToArrayBuffer(encIv))
+      });
+      dek = await crypto.subtle.importKey('raw', rawDek, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+    } else {
+      dek = await importKeyFromString(key);
+    }
+
+    const aad = expdate ? new TextEncoder().encode(expdate) : undefined;
+
+    const encPayloadBuffer = base64ToArrayBuffer(params.epayload);
+
+    if (mode === 'simple') {
+      const decryptedPayload = await decryptData(dek, {
+        ciphertext: encPayloadBuffer,
+        iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
+        additionalData: aad,
+      });
+      return pako.ungzip(new Uint8Array(decryptedPayload)).buffer;
+    }
+
+    const fileIdBuffer = await decryptData(dek, {
+      ciphertext: encPayloadBuffer,
+      iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
+      additionalData: aad,
     });
-    dek = await crypto.subtle.importKey('raw', rawDek, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
-  } else {
-    dek = await importKeyFromString(key);
-  }
+    const fileId = new TextDecoder().decode(fileIdBuffer);
 
-  const aad = expdate ? new TextEncoder().encode(expdate) : undefined;
-
-  const encPayloadBuffer = base64ToArrayBuffer(params.epayload);
-  const fileIdBuffer = await decryptData(dek, {
-    ciphertext: encPayloadBuffer,
-    iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
-    additionalData: aad
-  });
-  const fileId = new TextDecoder().decode(fileIdBuffer);
-
-  const downloadData = await downloadHandler(fileId);
+    const downloadData = await downloadHandler(fileId);
 
     const decryptedPayload = await decryptData(dek, {
       ciphertext: downloadData.ciphertext,
       iv: downloadData.iv,
-      additionalData: aad
+      additionalData: aad,
     });
-
-    if (mode === 'simple') {
-      return pako.ungzip(new Uint8Array(decryptedPayload)).buffer;
-    }
 
     return decryptedPayload;
   } finally {

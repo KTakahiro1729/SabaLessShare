@@ -147,11 +147,12 @@ const data = await receiveSharedData({
 
 生成されるリンクは以下の形式になります：
 
-```
-https://example.com/demo/?p=<base64-encoded-encrypted-file-id>#k=<key>&i=<iv>&m=<mode>&s=<salt>&x=<expdate>
+-```
+https://example.com/demo/?data=<encrypted-data-or-id>#k=<key>&i=<iv>&m=<mode>&s=<salt>&x=<expdate>
 ```
 
-- `p`（クエリパラメータ）: 暗号化されたファイルID
+- `data`（クエリパラメータ）: Simple Modeでは暗号化データ本体、Cloud/Dynamic Modeでは暗号化されたファイルID
+- ※互換性のため旧形式の `p`/`epayload` も読み込めます
 - `k`（フラグメント）: DEK（パスワード有りの場合は暗号化されたDEK）
 - `i`（フラグメント）: ファイルID暗号化用のIV
 - `m`（フラグメント）: 動作モード（`s` / `c` / `d`）
@@ -184,10 +185,10 @@ https://example.com/demo/?p=<base64-encoded-encrypted-file-id>#k=<key>&i=<iv>&m=
 
 - データを gzip 圧縮してから暗号化
 - 小さなテキストデータに適している
-- `uploadHandler` の戻り値をファイルIDとして扱う
+- データはURLに直接埋め込まれるため `uploadHandler` は使用しない
 
-Simple Modeでは暗号化済みIDをBase64化した`p`クエリに直接埋め込みます。
-この`p`値はURLエンコード前でおよそ**7700文字**までに制限されています。
+Simple Modeでは暗号化済みデータをBase64化した`data`クエリに直接埋め込みます。
+この`data`値はURLエンコード前でおよそ**7700文字**までに制限されています。
 それ以上のデータを扱う場合はCloud Modeの利用を検討してください。
 以下は圧縮前のデータサイズと上限の関係を示したおおよその目安です（実際の圧縮率はデータ内容によって大きく変動します）。
 
@@ -210,8 +211,8 @@ Simple Modeでは暗号化済みIDをBase64化した`p`クエリに直接埋め�
 
 1. DEK（データ暗号化キー）を生成
 2. データを暗号化（Simple Modeの場合はgzip圧縮後）
-3. 暗号化データを`uploadHandler`でアップロード
-4. ファイルIDを暗号化してクエリパラメータに格納
+3. Simple Modeでは暗号化データをBase64化して`data`クエリに格納し、Cloud Modeでは`uploadHandler`でアップロード
+4. Cloud Modeの場合、ファイルIDを暗号化してクエリパラメータに格納
 5. DEKと暗号化パラメータをフラグメントに格納
 6. 完成したURLを`shortenUrlHandler`で短縮
 
@@ -220,10 +221,9 @@ Simple Modeでは暗号化済みIDをBase64化した`p`クエリに直接埋め�
 1. URLからパラメータを解析
 2. 有効期限チェック
 3. パスワードが必要な場合は入力を求める
-4. ファイルIDを復号
-5. `downloadHandler`で暗号化データを取得
-6. データを復号（Simple Modeの場合は展開）
-7. **重要**: ブラウザ履歴からURLパラメータを削除
+4. Cloud ModeではファイルIDを復号して`downloadHandler`でデータ取得
+5. 暗号化データを復号（Simple Modeの場合は展開）
+6. **重要**: ブラウザ履歴からURLパラメータを削除
 
 ## 重要な制約事項
 
