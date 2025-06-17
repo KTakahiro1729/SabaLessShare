@@ -1,5 +1,7 @@
-import argon2 from 'argon2-browser';
+import { pbkdf2 } from '@noble/hashes/pbkdf2';
+import { sha256 } from '@noble/hashes/sha256';
 import { DecryptionError } from './errors.js';
+
 const cryptoObj = globalThis.crypto;
 
 /**
@@ -47,7 +49,7 @@ export function generateSalt(length = 16) {
 export async function generateDek() {
   return cryptoObj.subtle.generateKey(
     { name: 'AES-GCM', length: 128 },
-    true,
+    true, 
     ['encrypt', 'decrypt']
   );
 }
@@ -60,16 +62,11 @@ export async function generateDek() {
  */
 export async function generateKek(password, salt) {
   if (!password || !salt) throw new Error('Password and salt are required for KEK generation.');
-  const result = await argon2.hash({
-    pass: password,
-    salt: salt,
-    time: 2,
-    mem: 19456,
-    hashLen: 32,
-    parallelism: 1,
-    type: argon2.ArgonType.Argon2id,
+  const key = pbkdf2(sha256, password, salt, {
+    c: 100000, // iterations
+    dkLen: 32  // 32 bytes = 256 bits
   });
-  return cryptoObj.subtle.importKey('raw', result.hash.buffer, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+  return cryptoObj.subtle.importKey('raw', key, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
 }
 
 /**
