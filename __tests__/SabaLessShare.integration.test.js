@@ -22,32 +22,18 @@ const { PayloadTooLargeError } = await import('../src/errors.js');
 // --- テスト用のモックハンドラ ---
 const MOCK_BASE_URL = 'https://example.com/demo/';
 const cloudStorage = new Map();
-const simpleStorage = new Map();
 
 const mockUploadHandler = async (data, mode) => {
-    if (mode === 'simple') {
-        const id = `simple-${crypto.randomUUID()}`;
-        simpleStorage.set(id, data);
-        return `${MOCK_BASE_URL}?epayload=${id}`;
-    } else { // cloud
-        const fileId = `mock-file-${crypto.randomUUID()}`;
-        cloudStorage.set(fileId, data);
-        return fileId;
-    }
+    const fileId = `mock-file-${crypto.randomUUID()}`;
+    cloudStorage.set(fileId, data);
+    return fileId;
 };
 
 const mockShortenUrlHandler = async (url) => url; // テストでは短縮しない
 
-const mockDownloadHandler = async (idOrUrl) => {
-    if (idOrUrl.startsWith('http')) { // simple
-        const url = new URL(idOrUrl);
-        const id = url.searchParams.get('epayload');
-        if (!simpleStorage.has(id)) throw new Error('Mock simple data not found');
-        return simpleStorage.get(id);
-    } else { // cloud
-        if (!cloudStorage.has(idOrUrl)) throw new Error('Mock file not found');
-        return cloudStorage.get(idOrUrl);
-    }
+const mockDownloadHandler = async (id) => {
+    if (!cloudStorage.has(id)) throw new Error('Mock file not found');
+    return cloudStorage.get(id);
 };
 
 describe('SabaLessShare Integration Tests', () => {
@@ -77,7 +63,11 @@ describe('SabaLessShare Integration Tests', () => {
             expiresInDays: useExpiry ? 1 : undefined,
         });
 
-        expect(link).toContain('?p=');
+        if (mode === 'simple') {
+            expect(link).toContain('?data=');
+        } else {
+            expect(link).toContain('?p=');
+        }
         expect(link).toContain('#');
         expect(link).toMatch(/k=[^&]+/);
         expect(link).toMatch(/i=[^&]+/);
@@ -129,8 +119,8 @@ describe('SabaLessShare Integration Tests', () => {
 
         const urlObj = new URL(link);
         const qp = urlObj.searchParams;
-        qp.set('epayload', qp.get('p'));
-        qp.delete('p');
+        qp.set('epayload', qp.get('data'));
+        qp.delete('data');
         urlObj.search = '?' + qp.toString();
 
         const fp = new URLSearchParams(urlObj.hash.substring(1));
@@ -190,12 +180,12 @@ describe('SabaLessShare Integration Tests', () => {
 
     it('simpleモードでペイロードが大きすぎる場合にエラーをスローすること', async () => {
         const bigData = crypto.getRandomValues(new Uint8Array(10000));
-        const bigUploadHandler = async () => 'x'.repeat(8000);
+        const dummyHandler = jest.fn();
 
         await expect(createShareLink({
             data: bigData,
             mode: 'simple',
-            uploadHandler: bigUploadHandler,
+            uploadHandler: dummyHandler,
             shortenUrlHandler: mockShortenUrlHandler,
         })).rejects.toThrow(PayloadTooLargeError);
     });

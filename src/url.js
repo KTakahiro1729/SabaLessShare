@@ -23,6 +23,10 @@ export function parseShareUrl(location) {
     expdate: fragmentParams.get('x') || fragmentParams.get('expdate') || null,
     key: key,
     iv: iv,
-    epayload: queryParams.get('p') || queryParams.get('epayload') || '',
+    epayload:
+      queryParams.get('data') ||
+      queryParams.get('p') ||
+      queryParams.get('epayload') ||
+      '',
   };
 }
